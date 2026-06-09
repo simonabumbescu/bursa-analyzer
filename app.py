@@ -12,9 +12,15 @@ import streamlit as st
 
 from bvb_tickers import BVB_COMPANIES
 from analyzer import (
-    analyze_company,
+    analyze_company as _analyze_company,
     VERDICT_BUY, VERDICT_NEUTRU, VERDICT_RISC, VERDICT_NA,
 )
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def analyze_company(ticker_symbol):
+    """Cache 15 min ca sa nu lovim Yahoo la fiecare reincarcare."""
+    return _analyze_company(ticker_symbol)
 
 st.set_page_config(page_title="Analizor Actiuni BVB", page_icon="📈", layout="wide")
 

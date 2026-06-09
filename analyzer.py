@@ -282,20 +282,59 @@ def _sma(close, period):
 # Functia principala de analiza a unei firme
 # ---------------------------------------------------------------------------
 
+def _robust_info(tk, tries=3):
+    """Yahoo limiteaza IP-urile de datacenter; reincercam de cateva ori."""
+    import time
+    for i in range(tries):
+        try:
+            info = tk.info or {}
+            if info and (info.get("currentPrice") or info.get("regularMarketPrice")
+                         or info.get("longName")):
+                return info
+        except Exception:
+            pass
+        time.sleep(1.2 * (i + 1))
+    return {}
+
+
+def _stmt_lookup(df, *labels):
+    """Cauta o linie (dupa eticheta) in income_stmt/financials si ia valoarea cea mai recenta."""
+    if df is None or getattr(df, "empty", True):
+        return None
+    for label in labels:
+        if label in df.index:
+            row = df.loc[label].dropna()
+            if not row.empty:
+                try:
+                    return float(row.iloc[0])
+                except (TypeError, ValueError):
+                    return None
+    return None
+
+
 def analyze_company(ticker_symbol):
     """
     Returneaza un dict structurat cu toti indicatorii unei firme.
     """
     tk = yf.Ticker(ticker_symbol)
-    try:
-        info = tk.info or {}
-    except Exception:
-        info = {}
+    info = _robust_info(tk)
 
     try:
         hist = tk.history(period="1y")
     except Exception:
         hist = pd.DataFrame()
+
+    # Fallback pentru fundamentale (profit, EBITDA, venituri) cand info e gol/limitat,
+    # folosind situatiile financiare (alt endpoint Yahoo, mai rar blocat).
+    fin = None
+    if not info.get("netIncomeToCommon") or not info.get("ebitda") or not info.get("totalRevenue"):
+        try:
+            fin = tk.income_stmt
+        except Exception:
+            fin = None
+    fb_net = _stmt_lookup(fin, "Net Income", "Net Income Common Stockholders")
+    fb_ebitda = _stmt_lookup(fin, "EBITDA", "Normalized EBITDA")
+    fb_rev = _stmt_lookup(fin, "Total Revenue", "Operating Revenue")
 
     close = hist["Close"].dropna() if (hist is not None and not hist.empty) else pd.Series(dtype=float)
 
@@ -405,7 +444,7 @@ def analyze_company(ticker_symbol):
     # Net Debt / EBITDA
     total_debt = info.get("totalDebt")
     cash = info.get("totalCash")
-    ebitda = info.get("ebitda")
+    ebitda = info.get("ebitda") or fb_ebitda
     nd_ebitda = None
     if total_debt is not None and ebitda and ebitda != 0:
         net_debt = total_debt - (cash or 0)
@@ -488,9 +527,9 @@ def analyze_company(ticker_symbol):
         "Pret curent": price,
         "Moneda": info.get("currency", "RON"),
         "Market Cap": info.get("marketCap"),
-        "Profit net (TTM)": info.get("netIncomeToCommon"),
+        "Profit net (TTM)": info.get("netIncomeToCommon") or fb_net,
         "EBITDA": ebitda,
-        "Venituri (TTM)": info.get("totalRevenue"),
+        "Venituri (TTM)": info.get("totalRevenue") or fb_rev,
         "52w High": high52,
         "52w Low": low52,
         "Volum mediu": info.get("averageVolume"),
