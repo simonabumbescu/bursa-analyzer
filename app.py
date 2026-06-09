@@ -15,6 +15,7 @@ from analyzer import (
     analyze_company as _analyze_company,
     VERDICT_BUY, VERDICT_NEUTRU, VERDICT_RISC, VERDICT_NA,
 )
+from pdf_export import build_company_pdf, build_ranking_pdf
 
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -114,6 +115,18 @@ if mode == "Analiza o firma":
     d2.metric("EBITDA", f"{fmt_big(raw.get('EBITDA'))} {cur}")
     d3.metric("Venituri (TTM)", f"{fmt_big(raw.get('Venituri (TTM)'))} {cur}")
     d4.metric("Volum mediu", fmt_big(raw.get('Volum mediu')))
+
+    # --- Buton descarcare PDF firma ---
+    try:
+        pdf_bytes = build_company_pdf(data, company)
+        st.download_button(
+            "📄 Descarca raport PDF",
+            data=pdf_bytes,
+            file_name=f"raport_{ticker.replace('.', '_')}.pdf",
+            mime="application/pdf",
+        )
+    except Exception as e:
+        st.caption(f"PDF indisponibil momentan: {e}")
 
     # --- Grafic pret cu swing points HH/HL ---
     hist = data.get("hist")
@@ -289,5 +302,18 @@ else:
 
         st.dataframe(df, use_container_width=True)
         st.success("Clasament generat. Pozitia 1 = scor cel mai mare.")
+
+        # --- PDF clasament ---
+        try:
+            ranking_rows = df.to_dict("records")
+            pdf_bytes = build_ranking_pdf(ranking_rows)
+            st.download_button(
+                "📄 Descarca clasament PDF",
+                data=pdf_bytes,
+                file_name="clasament_bvb.pdf",
+                mime="application/pdf",
+            )
+        except Exception as e:
+            st.caption(f"PDF clasament indisponibil: {e}")
     else:
         st.info("Apasa butonul pentru a calcula scorul tuturor firmelor si a genera clasamentul.")
