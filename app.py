@@ -223,7 +223,10 @@ if mode == "Analiza o firma":
         def color_verdict(val):
             for v, label in VERDICT_EMOJI.items():
                 if val == label:
-                    return f"color: {VERDICT_COLORS[v]}; font-weight: 600;"
+                    # fundal colorat (bine suportat de st.dataframe pe orice versiune)
+                    text = "#ffffff" if v != VERDICT_NA else "#111111"
+                    return (f"background-color: {VERDICT_COLORS[v]}; "
+                            f"color: {text}; font-weight: 700;")
             return ""
 
         styler = df.style
