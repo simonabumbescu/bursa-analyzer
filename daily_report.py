@@ -15,6 +15,27 @@ import ssl
 from datetime import datetime
 from email.message import EmailMessage
 
+# Orele (in ora Romaniei) la care vrem sa trimitem raportul
+ORE_TRIMITERE = {9, 19}
+
+
+def ora_romaniei():
+    """Returneaza (ora, este_zi_lucratoare) in fusul orar al Romaniei."""
+    try:
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo("Europe/Bucharest"))
+    except Exception:
+        now = datetime.utcnow()  # fallback: UTC
+    return now.hour, now.weekday() < 5  # weekday: 0=luni ... 4=vineri
+
+
+def trebuie_sa_trimit():
+    """Trimite doar la orele dorite, in zile lucratoare. Rularea manuala trimite mereu."""
+    if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+        return True  # buton "Run workflow" - test, trimite oricum
+    ora, e_lucratoare = ora_romaniei()
+    return e_lucratoare and ora in ORE_TRIMITERE
+
 from bvb_tickers import BVB_COMPANIES
 from analyzer import analyze_company
 from scoring import compute_weighted_score, PROFILES, VERDICT_POINTS
@@ -57,7 +78,7 @@ def send_email(pdf_bytes):
     user = os.environ.get("SMTP_USER")
     password = os.environ.get("SMTP_PASS")
     mail_to = os.environ.get("MAIL_TO") or user
-    subject = os.environ.get("MAIL_SUBJECT") or f"Clasament BVB - {datetime.now():%d.%m.%Y}"
+    subject = os.environ.get("MAIL_SUBJECT") or "Bursa de azi"
 
     if not user or not password:
         raise SystemExit("Lipsesc SMTP_USER / SMTP_PASS (seteaza-le ca secrets).")
@@ -85,6 +106,11 @@ def send_email(pdf_bytes):
 
 
 def main():
+    if not trebuie_sa_trimit():
+        ora, e_lucratoare = ora_romaniei()
+        print(f"Nu trimit acum (ora Romaniei={ora}, zi lucratoare={e_lucratoare}). "
+              f"Trimit doar la orele {sorted(ORE_TRIMITERE)} luni-vineri.")
+        return
     sections = build_sections()
     pdf = build_daily_report_pdf(sections)
     print(f"PDF generat: {len(pdf)} bytes")

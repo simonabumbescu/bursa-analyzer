@@ -3,10 +3,14 @@ name: Raport zilnic BVB
 # Ruleaza zilnic la ora setata + posibilitate de rulare manuala (buton "Run workflow").
 on:
   schedule:
-    # ATENTIE: ora e in UTC! Romania = UTC+3 vara (EEST) / UTC+2 iarna (EET).
-    # Exemplu: '0 16 * * *' = 16:00 UTC = 19:00 in Romania vara / 18:00 iarna.
-    # Schimba "16" cu (ora_ta_Romania - 3) vara sau (ora_ta_Romania - 2) iarna.
-    - cron: '0 16 * * *'
+    # Vrem 09:00 si 19:00 ora Romaniei, luni-vineri.
+    # GitHub ruleaza in UTC, iar scriptul (daily_report.py) verifica ora Romaniei
+    # si trimite DOAR daca e ora 9 sau 19 - asa merge corect si vara si iarna.
+    # Acoperim ambele variante de fus:
+    - cron: '0 6 * * 1-5'    # 09:00 RO vara (EEST, UTC+3)
+    - cron: '0 7 * * 1-5'    # 09:00 RO iarna (EET, UTC+2)
+    - cron: '0 16 * * 1-5'   # 19:00 RO vara (EEST, UTC+3)
+    - cron: '0 17 * * 1-5'   # 19:00 RO iarna (EET, UTC+2)
   workflow_dispatch: {}   # permite pornire manuala din tab-ul Actions
 
 jobs:
