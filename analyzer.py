@@ -336,6 +336,25 @@ def analyze_company(ticker_symbol):
     fb_ebitda = _stmt_lookup(fin, "EBITDA", "Normalized EBITDA")
     fb_rev = _stmt_lookup(fin, "Total Revenue", "Operating Revenue")
 
+    # Bilant + cashflow pentru fallback la sanatatea financiara
+    try:
+        bs = tk.balance_sheet
+    except Exception:
+        bs = None
+    try:
+        cf = tk.cashflow
+    except Exception:
+        cf = None
+    bs_equity = _stmt_lookup(bs, "Stockholders Equity", "Total Equity Gross Minority Interest",
+                             "Common Stock Equity")
+    bs_total_debt = _stmt_lookup(bs, "Total Debt")
+    bs_cur_assets = _stmt_lookup(bs, "Current Assets", "Total Current Assets")
+    bs_cur_liab = _stmt_lookup(bs, "Current Liabilities", "Total Current Liabilities")
+    bs_inventory = _stmt_lookup(bs, "Inventory")
+    cf_fcf = _stmt_lookup(cf, "Free Cash Flow")
+    cf_ocf = _stmt_lookup(cf, "Operating Cash Flow", "Cash Flow From Continuing Operating Activities")
+    cf_capex = _stmt_lookup(cf, "Capital Expenditure")
+
     close = hist["Close"].dropna() if (hist is not None and not hist.empty) else pd.Series(dtype=float)
 
     indicators = []
@@ -424,25 +443,34 @@ def analyze_company(ticker_symbol):
         "BUY > 7% | NEUTRU 2-7% | RISC < 2%")
 
     # ---------------- C. SANATATE FINANCIARA ----------------
+    # yfinance da debtToEquity ca PROCENT (ex 199.3 = 1.99x). Impartim mereu la 100.
     de = info.get("debtToEquity")
-    if de is not None and de > 5:  # yfinance da uneori in % (ex 120 = 1.2)
+    if de is not None:
         de = de / 100.0
+    # Fallback din bilant: Total Debt / Capital propriu
+    if de is None and bs_total_debt and bs_equity:
+        de = bs_total_debt / bs_equity if bs_equity != 0 else None
     add("Debt/Equity", "Sanatate financiara", de, "x",
         _verdict_from_bands(de, good_max=0.5, bad_min=2),
         "BUY < 0.5 | NEUTRU 0.5-2 | RISC > 2")
 
     current_ratio = info.get("currentRatio")
+    if current_ratio is None and bs_cur_assets and bs_cur_liab:
+        current_ratio = bs_cur_assets / bs_cur_liab if bs_cur_liab != 0 else None
     add("Current Ratio", "Sanatate financiara", current_ratio, "x",
         _verdict_from_bands(current_ratio, good_min=1.5, bad_max=1, higher_better=True),
-        "BUY > 1.5 | NEUTRU 1-1.5 | RISC < 1")
+        "BUY > 1.5 | NEUTRU 1-1.5 | RISC < 1 (N/A la banci)")
 
     quick_ratio = info.get("quickRatio")
+    if quick_ratio is None and bs_cur_assets and bs_cur_liab:
+        quick_assets = bs_cur_assets - (bs_inventory or 0)
+        quick_ratio = quick_assets / bs_cur_liab if bs_cur_liab != 0 else None
     add("Quick Ratio", "Sanatate financiara", quick_ratio, "x",
         _verdict_from_bands(quick_ratio, good_min=1, bad_max=0.5, higher_better=True),
-        "BUY > 1 | NEUTRU 0.5-1 | RISC < 0.5")
+        "BUY > 1 | NEUTRU 0.5-1 | RISC < 0.5 (N/A la banci)")
 
     # Net Debt / EBITDA
-    total_debt = info.get("totalDebt")
+    total_debt = info.get("totalDebt") or bs_total_debt
     cash = info.get("totalCash")
     ebitda = info.get("ebitda") or fb_ebitda
     nd_ebitda = None
@@ -453,7 +481,12 @@ def analyze_company(ticker_symbol):
         _verdict_from_bands(nd_ebitda, good_max=1, bad_min=3),
         "BUY < 1 | NEUTRU 1-3 | RISC > 3")
 
+    # Free Cash Flow: info -> cashflow FCF -> operating - capex
     fcf = info.get("freeCashflow")
+    if fcf is None:
+        fcf = cf_fcf
+    if fcf is None and cf_ocf is not None:
+        fcf = cf_ocf + (cf_capex or 0)  # capex e negativ in cashflow
     add("Free Cash Flow", "Sanatate financiara", fcf, "RON",
         VERDICT_BUY if (fcf or 0) > 0 else (VERDICT_RISC if fcf is not None else VERDICT_NA),
         "BUY > 0 | RISC <= 0")
@@ -564,3 +597,166 @@ def analyze_company(ticker_symbol):
         "returns": returns,
         "trade_plan": trade_plan,
     }
+
+
+# ===========================================================================
+# ANALIZA ETF (look-through: media ponderata a componentelor + concentrare)
+# ===========================================================================
+
+def _hhi(weights):
+    """Indice Herfindahl-Hirschman de concentrare (suma patratelor ponderilor in fractii)."""
+    return sum((w / 100.0) ** 2 for w in weights)
+
+
+def analyze_etf(etf_def):
+    """
+    etf_def: dict cu 'ticker', 'index', 'descriere', 'holdings' {ticker: pondere%}.
+    Calculeaza:
+     - analiza tehnica/pret a ETF-ului (din Yahoo)
+     - look-through: indicatori fundamentali MEDII PONDERATI din componente
+     - concentrare (top 10, HHI), alocare pe sectoare, verdict ponderat
+    """
+    from bvb_etfs import SECTORS
+
+    ticker = etf_def["ticker"]
+    holdings = etf_def.get("holdings") or {}
+    etf_type = etf_def.get("type", "actiuni")
+
+    # Normalizeaza ponderile la 100% (daca exista holdings)
+    total_w = sum(holdings.values())
+    weights = {t: (w / total_w * 100.0) for t, w in holdings.items()} if total_w > 0 else {}
+
+    # --- Analiza pret/tehnica a ETF-ului in sine ---
+    tk = yf.Ticker(ticker)
+    info = _robust_info(tk)
+    try:
+        hist = tk.history(period="1y")
+    except Exception:
+        hist = pd.DataFrame()
+    close = hist["Close"].dropna() if (hist is not None and not hist.empty) else pd.Series(dtype=float)
+    price = close.iloc[-1] if not close.empty else info.get("currentPrice")
+    trend = analyze_trend_hh_hl(hist)
+    returns = compute_returns(tk, price)
+    trade_plan = compute_trade_plan(hist, trend, price)
+
+    etf_technical = []
+    rsi = _rsi(close) if not close.empty else None
+    rsi_v = VERDICT_NA
+    if rsi is not None:
+        rsi_v = VERDICT_BUY if rsi < 30 else (VERDICT_RISC if rsi > 70 else VERDICT_NEUTRU)
+    etf_technical.append(("RSI (14)", round(rsi, 1) if rsi else None, rsi_v))
+    etf_technical.append(("Structura HH/HL", trend.get("structure"), trend.get("verdict")))
+
+    # --- Look-through: analizeaza fiecare componenta ---
+    components = []
+    for t, w in weights.items():
+        try:
+            d = analyze_company(t)
+            ind_map = {i["name"]: i for i in d["indicators"]}
+            components.append({
+                "ticker": t,
+                "weight": w,
+                "name": d["raw"].get("Nume", t),
+                "sector": SECTORS.get(t, "Altele"),
+                "score": d["global_score"],
+                "verdict": d["global_verdict"],
+                "pe": _ind_val(ind_map, "P/E (trailing)"),
+                "roe": _ind_val(ind_map, "ROE (Return on Equity)"),
+                "net_margin": _ind_val(ind_map, "Marja neta (Net Margin)"),
+                "div_yield": _ind_val(ind_map, "Dividend Yield"),
+                "rev_growth": _ind_val(ind_map, "Crestere venituri (YoY)"),
+                "de": _ind_val(ind_map, "Debt/Equity"),
+            })
+        except Exception:
+            components.append({"ticker": t, "weight": w, "name": t,
+                               "sector": SECTORS.get(t, "Altele"), "score": None,
+                               "verdict": VERDICT_NA, "pe": None, "roe": None,
+                               "net_margin": None, "div_yield": None,
+                               "rev_growth": None, "de": None})
+
+    # --- Medii ponderate (renormalizate pe componentele care au valoare) ---
+    def wavg(key):
+        num = den = 0.0
+        for c in components:
+            v = c.get(key)
+            if v is not None:
+                num += v * c["weight"]
+                den += c["weight"]
+        return (num / den) if den > 0 else None
+
+    weighted = {
+        "P/E ponderat": (wavg("pe"), "x"),
+        "ROE ponderat": (wavg("roe"), "%"),
+        "Marja neta ponderata": (wavg("net_margin"), "%"),
+        "Dividend Yield ponderat": (wavg("div_yield"), "%"),
+        "Crestere venituri ponderata": (wavg("rev_growth"), "%"),
+        "Debt/Equity ponderat": (wavg("de"), "x"),
+    }
+
+    # --- Concentrare ---
+    sorted_comp = sorted(components, key=lambda c: c["weight"], reverse=True)
+    top10_weight = sum(c["weight"] for c in sorted_comp[:10])
+    hhi = _hhi([c["weight"] for c in components])
+    if top10_weight < 50:
+        conc_verdict = VERDICT_BUY
+    elif top10_weight < 70:
+        conc_verdict = VERDICT_NEUTRU
+    else:
+        conc_verdict = VERDICT_RISC
+
+    # --- Alocare pe sectoare ---
+    sector_alloc = {}
+    for c in components:
+        sector_alloc[c["sector"]] = sector_alloc.get(c["sector"], 0.0) + c["weight"]
+    sector_alloc = dict(sorted(sector_alloc.items(), key=lambda x: x[1], reverse=True))
+    max_sector = max(sector_alloc.values()) if sector_alloc else 0
+
+    # --- Scor global ponderat al ETF-ului (media scorurilor componentelor) ---
+    num = den = 0.0
+    for c in components:
+        if c["score"] is not None:
+            num += c["score"] * c["weight"]
+            den += c["weight"]
+    etf_score = round(num / den, 1) if den > 0 else None
+    if etf_score is None:
+        etf_verdict = VERDICT_NA
+    elif etf_score >= 65:
+        etf_verdict = VERDICT_BUY
+    elif etf_score >= 40:
+        etf_verdict = VERDICT_NEUTRU
+    else:
+        etf_verdict = VERDICT_RISC
+
+    return {
+        "ticker": ticker,
+        "name": info.get("longName") or info.get("shortName") or ticker,
+        "index": etf_def.get("index"),
+        "type": etf_type,
+        "descriere": etf_def.get("descriere"),
+        "price": price,
+        "currency": info.get("currency", "RON"),
+        "avg_volume": info.get("averageVolume"),
+        "hist": hist,
+        "trend": trend,
+        "returns": returns,
+        "trade_plan": trade_plan,
+        "etf_technical": etf_technical,
+        "components": sorted_comp,
+        "weighted": weighted,
+        "top10_weight": round(top10_weight, 1),
+        "hhi": round(hhi, 3),
+        "conc_verdict": conc_verdict,
+        "sector_alloc": {k: round(v, 1) for k, v in sector_alloc.items()},
+        "max_sector": round(max_sector, 1),
+        "etf_score": etf_score,
+        "etf_verdict": etf_verdict,
+        "n_holdings": len(components),
+    }
+
+
+def _ind_val(ind_map, name):
+    ind = ind_map.get(name)
+    if ind is None:
+        return None
+    v = ind.get("value")
+    return v if isinstance(v, (int, float)) else None

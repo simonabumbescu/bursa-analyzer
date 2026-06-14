@@ -1,0 +1,97 @@
+============================================================
+  ANALIZOR ACTIUNI BVB - Instructiuni
+============================================================
+
+Aplicatie de analiza a actiunilor si ETF-urilor listate la
+Bursa de Valori Bucuresti (BVB), cu date live de pe Yahoo Finance.
+
+
+------------------------------------------------------------
+  CUM INSTALEZI (pe un calculator nou, o singura data)
+------------------------------------------------------------
+
+1. Copiaza TOT folderul pe calculatorul nou.
+
+2. Dublu-click pe fisierul:  install.bat
+
+   Acesta verifica Python, il instaleaza daca lipseste,
+   si instaleaza toate bibliotecile necesare.
+
+   - Daca Python lipseste si se instaleaza automat:
+     dupa ce termina, INCHIDE fereastra si ruleaza
+     din nou install.bat (ca sa se actualizeze PATH-ul).
+
+   - Ai nevoie de conexiune la internet.
+
+
+------------------------------------------------------------
+  CUM PORNESTI APLICATIA (de fiecare data)
+------------------------------------------------------------
+
+Dublu-click pe fisierul:  start.bat
+
+  - Aplicatia se deschide singura in browser, la adresa:
+    http://localhost:8501
+
+  - NU inchide fereastra neagra (CMD) cat folosesti
+    aplicatia. Daca o inchizi, aplicatia se opreste.
+
+  - Ca sa o opresti: inchide fereastra neagra
+    sau apasa Ctrl+C in ea.
+
+
+------------------------------------------------------------
+  CE POTI FACE IN APLICATIE
+------------------------------------------------------------
+
+In meniul din stanga ai 3 moduri:
+
+1. ANALIZA O FIRMA
+   - Alegi o firma BVB din lista.
+   - Vezi toti indicatorii (evaluare, profitabilitate,
+     sanatate financiara, crestere, tehnic) cu verdict
+     colorat: VERDE (BUY), GALBEN (NEUTRU), ROSU (RISC).
+   - Randament pe 1 luna - 6 ani.
+   - Grafic pret cu niveluri Take Profit / Stop Loss.
+   - Buton de descarcare raport PDF.
+
+2. ANALIZA ETF
+   - Alegi un ETF de la BVB.
+   - Vezi indicatorii medii ponderati (look-through),
+     concentrarea, alocarea pe sectoare si fiecare
+     companie cu ponderea si verdictul ei.
+   - Buton de descarcare raport ETF PDF.
+
+3. CLASAMENT TOATE FIRMELE
+   - Genereaza un clasament al tuturor firmelor dupa scor.
+   - Buton de descarcare clasament PDF.
+
+In stanga ai si butonul "Ghid indicatori (PDF)" care explica
+ce inseamna fiecare indicator si cum se citeste.
+
+Butonul "Reimprospateaza date (live)" aduce date noi instant.
+
+NOTATIE CIFRE (ca pe site-urile financiare):
+  T = Trilion (1.000 miliarde)
+  B = Billion / Miliard
+  M = Million / Milion
+  K = Thousand / Mie
+  Ex: market cap 41.39B RON = 41,39 miliarde lei.
+
+
+------------------------------------------------------------
+  PROBLEME FRECVENTE
+------------------------------------------------------------
+
+- "Python nu este instalat": ruleaza install.bat, sau
+  instaleaza Python 3.12 de pe https://www.python.org/downloads/
+  bifand "Add Python to PATH".
+
+- Vad date incomplete / N/A: Yahoo limiteaza uneori datele.
+  Apasa "Reimprospateaza date" sau incearca din nou mai tarziu.
+  Datele Yahoo au intarziere de ~15 minute pentru BVB.
+
+- Aplicatia nu se deschide in browser: deschide manual
+  http://localhost:8501 in browser.
+
+============================================================

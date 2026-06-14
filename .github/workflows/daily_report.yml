@@ -1,0 +1,32 @@
+name: Raport zilnic BVB
+
+# Ruleaza zilnic la ora setata + posibilitate de rulare manuala (buton "Run workflow").
+on:
+  schedule:
+    # ATENTIE: ora e in UTC! Romania = UTC+3 vara (EEST) / UTC+2 iarna (EET).
+    # Exemplu: '0 16 * * *' = 16:00 UTC = 19:00 in Romania vara / 18:00 iarna.
+    # Schimba "16" cu (ora_ta_Romania - 3) vara sau (ora_ta_Romania - 2) iarna.
+    - cron: '0 16 * * *'
+  workflow_dispatch: {}   # permite pornire manuala din tab-ul Actions
+
+jobs:
+  raport:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descarca codul
+        uses: actions/checkout@v4
+
+      - name: Instaleaza Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instaleaza dependentele
+        run: pip install -r requirements.txt
+
+      - name: Genereaza si trimite raportul
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: python daily_report.py
