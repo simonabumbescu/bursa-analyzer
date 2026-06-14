@@ -28,3 +28,31 @@ BVB_COMPANIES = {
     "Premier Energy (PE)": "PE.RO",
     "Hidroelectrica (H2O)": "H2O.RO",
 }
+
+# Descriere scurta (2 fraze): cu ce face bani fiecare firma.
+COMPANY_DESC = {
+    "TLV.RO": "Cea mai mare banca din Romania dupa active. Castiga din dobanzi la credite, comisioane bancare si servicii financiare.",
+    "SNP.RO": "Cel mai mare producator de petrol si gaze din Romania (grup OMV). Castiga din extractia, rafinarea si vanzarea de carburanti si gaze.",
+    "SNG.RO": "Cel mai mare producator de gaze naturale din Romania. Castiga din extractia si vanzarea gazelor, plus productie de energie electrica.",
+    "SNN.RO": "Opereaza centrala nucleara de la Cernavoda. Castiga din productia si vanzarea de energie electrica nucleara.",
+    "BRD.RO": "A treia banca din Romania, parte din grupul francez Societe Generale. Castiga din credite, comisioane si servicii bancare.",
+    "DIGI.RO": "Operator de telecomunicatii (RCS-RDS): internet, TV, telefonie mobila in RO si international. Castiga din abonamente lunare.",
+    "EL.RO": "Distributie si furnizare de energie electrica catre consumatori. Castiga din tarifele de distributie si vanzarea curentului.",
+    "TGN.RO": "Operatorul national de transport al gazelor naturale prin conducte. Castiga din tarife de transport al gazelor.",
+    "TEL.RO": "Operatorul national al retelei de transport a energiei electrice. Castiga din tarife de transport al electricitatii.",
+    "FP.RO": "Fond de investitii care detine participatii in mari companii romanesti. Castiga din dividende si aprecierea participatiilor.",
+    "M.RO": "Cel mai mare operator privat de servicii medicale din Romania. Castiga din clinici, spitale, laboratoare si abonamente medicale.",
+    "TTS.RO": "Lider in transport fluvial pe Dunare si logistica portuara. Castiga din transportul de marfuri (cereale, materii prime).",
+    "SFG.RO": "Opereaza francize de fast-food in Romania (KFC, Pizza Hut, Taco Bell). Castiga din vanzarile restaurantelor.",
+    "WINE.RO": "Producator de vinuri premium din Romania si Republica Moldova (Purcari). Castiga din productia si vanzarea de vinuri.",
+    "AQ.RO": "Distributie si logistica de bunuri de larg consum. Castiga din distributia produselor catre magazine si retele.",
+    "ONE.RO": "Dezvoltator imobiliar premium in Bucuresti (rezidential, birouri). Castiga din vanzarea si inchirierea proprietatilor.",
+    "BVB.RO": "Operatorul Bursei de Valori Bucuresti. Castiga din comisioane de tranzactionare, taxe de listare si servicii de date.",
+    "COTE.RO": "Transporta titei prin conducte catre rafinarii (Conpet). Castiga din tarifele de transport al petrolului.",
+    "ALR.RO": "Unul dintre cei mai mari producatori de aluminiu din Europa de Est (Alro Slatina). Castiga din productia si vanzarea de aluminiu.",
+    "TRP.RO": "Producator de materiale de constructii (tevi, profile PVC, panouri). Castiga din vanzarea acestor produse.",
+    "BIO.RO": "Unul dintre cei mai mari producatori romani de medicamente si suplimente (Biofarm). Castiga din vanzarea acestora.",
+    "ATB.RO": "Mare producator romanesc de medicamente, lider la antibiotice (Antibiotice Iasi). Castiga din vanzarea produselor farmaceutice.",
+    "PE.RO": "Furnizor si distribuitor de energie electrica si gaze naturale (Premier Energy). Castiga din furnizarea de energie si gaze.",
+    "H2O.RO": "Cel mai mare producator de energie electrica din Romania, din hidrocentrale (Hidroelectrica). Castiga din productia si vanzarea de electricitate verde.",
+}

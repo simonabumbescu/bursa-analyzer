@@ -132,6 +132,14 @@ def build_company_pdf(data, company_name, profile=None, weighted_score=None,
     if profile:
         subtitle += f"  |  Profil: {profile}"
     elems.append(Paragraph(subtitle, ss["Small"]))
+    try:
+        from bvb_tickers import COMPANY_DESC
+        desc = COMPANY_DESC.get(data["ticker"])
+        if desc:
+            elems.append(Spacer(1, 3))
+            elems.append(Paragraph(f"<b>Cu ce face bani:</b> {desc}", ss["Normal"]))
+    except Exception:
+        pass
     elems.append(Spacer(1, 6))
 
     # --- Verdict global + date cheie ---
@@ -510,10 +518,12 @@ def build_etf_pdf(e, etf_name):
     return buf.getvalue()
 
 
-def build_daily_report_pdf(sections):
+def build_daily_report_pdf(sections, context=None):
     """
     Raport zilnic: un PDF cu clasamentul pe mai multe profile.
     sections: lista de (profil, rows) - rows ca la build_ranking_pdf.
+    context: dict optional cu 'gainers', 'losers' (liste de (nume, pct))
+             si 'changes' {profil: {'intrate':[...], 'iesite':[...]}}.
     """
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4,
@@ -521,11 +531,30 @@ def build_daily_report_pdf(sections):
                             topMargin=15*mm, bottomMargin=15*mm)
     ss = _styles()
     elems = [
-        Paragraph("Clasament zilnic firme BVB", ss["TitleRo"]),
+        Paragraph("Bursa de azi - clasament BVB", ss["TitleRo"]),
         Paragraph(f"Generat automat: {datetime.now():%d.%m.%Y %H:%M}  |  "
                   f"Clasament pe {len(sections)} profile de evaluare", ss["Small"]),
         Spacer(1, 8),
     ]
+
+    # --- Context zilnic ---
+    if context:
+        elems.append(Paragraph("Context azi", ss["H2Ro"]))
+        gainers = context.get("gainers", [])
+        losers = context.get("losers", [])
+        if gainers or losers:
+            g_txt = ", ".join(f"{n} ({p:+.1f}%)" for n, p in gainers) or "-"
+            l_txt = ", ".join(f"{n} ({p:+.1f}%)" for n, p in losers) or "-"
+            elems.append(Paragraph(f"<b>Cele mai mari cresteri:</b> {g_txt}", ss["Normal"]))
+            elems.append(Paragraph(f"<b>Cele mai mari scaderi:</b> {l_txt}", ss["Normal"]))
+        changes = context.get("changes", {})
+        for prof, ch in changes.items():
+            intrate = ", ".join(ch.get("intrate", [])) or "niciuna"
+            iesite = ", ".join(ch.get("iesite", [])) or "niciuna"
+            elems.append(Paragraph(
+                f"<b>{prof}</b> - intrate in top 10: {intrate}; iesite: {iesite}",
+                ss["Small"]))
+        elems.append(Spacer(1, 10))
 
     for profile, rows in sections:
         elems.append(Paragraph(f"Profil: {profile}", ss["H2Ro"]))

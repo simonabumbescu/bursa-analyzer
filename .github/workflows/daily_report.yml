@@ -13,6 +13,9 @@ on:
     - cron: '0 17 * * 1-5'   # 19:00 RO iarna (EET, UTC+2)
   workflow_dispatch: {}   # permite pornire manuala din tab-ul Actions
 
+permissions:
+  contents: write   # ca sa poata salva snapshot-ul (last_top.json) inapoi in repo
+
 jobs:
   raport:
     runs-on: ubuntu-latest
@@ -33,4 +36,13 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: python daily_report.py
+
+      - name: Salveaza topul zilei (pentru comparatia de maine)
+        run: |
+          git config user.name "bvb-bot"
+          git config user.email "bvb-bot@users.noreply.github.com"
+          git add last_top.json || true
+          git commit -m "snapshot top $(date +%F)" || echo "nimic de salvat"
+          git push || echo "push esuat (probabil nimic de salvat)"

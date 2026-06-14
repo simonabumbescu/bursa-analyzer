@@ -126,6 +126,9 @@ if mode == "Analiza o firma":
 
     st.title(f"Analiza: {company}")
     st.caption(f"Ticker Yahoo: `{ticker}`")
+    from bvb_tickers import COMPANY_DESC
+    if COMPANY_DESC.get(ticker):
+        st.info(f"💼 **Cu ce face bani:** {COMPANY_DESC[ticker]}")
 
     with st.spinner("Aduc datele live..."):
         data = analyze_company(ticker)

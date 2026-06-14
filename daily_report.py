@@ -9,11 +9,14 @@ Configurare prin variabile de mediu (GitHub Secrets):
   MAIL_SUBJECT (optional) - subiectul emailului
 """
 
+import json
 import os
 import smtplib
 import ssl
 from datetime import datetime
 from email.message import EmailMessage
+
+SNAPSHOT_FILE = "last_top.json"  # top-ul zilei precedente (pentru intrate/iesite)
 
 # Orele (in ora Romaniei) la care vrem sa trimitem raportul
 ORE_TRIMITERE = {9, 19}
@@ -46,7 +49,7 @@ VERDICT_LABEL = {"BUY": "BUY", "NEUTRU": "NEUTRU", "RISC": "RISC", "N/A": "N/A"}
 
 
 def build_sections():
-    """Analizeaza toate firmele si construieste clasamentul pentru fiecare profil."""
+    """Analizeaza toate firmele si construieste clasamentul + contextul zilnic."""
     print("Analizez firmele...")
     analyzed = {}
     for name, ticker in BVB_COMPANIES.items():
@@ -57,6 +60,7 @@ def build_sections():
             print(f"  EROARE {ticker}: {ex}")
 
     sections = []
+    today_top = {}
     for profile in PROFILES:
         rows = []
         for name, data in analyzed.items():
@@ -71,7 +75,42 @@ def build_sections():
             })
         rows.sort(key=lambda r: (r["Scor"] is None, -(r["Scor"] or 0)))
         sections.append((profile, rows))
-    return sections
+        today_top[profile] = [r["Firma"] for r in rows[:10]]
+
+    # --- Context: cele mai mari miscari de pret azi ---
+    movers = [(name, data["raw"].get("Variatie zi %"))
+              for name, data in analyzed.items()
+              if data["raw"].get("Variatie zi %") is not None]
+    movers.sort(key=lambda x: x[1], reverse=True)
+    gainers = [(n, p) for n, p in movers[:3] if p > 0]
+    losers = [(n, p) for n, p in movers[-3:] if p < 0]
+    losers.sort(key=lambda x: x[1])
+
+    # --- Context: intrate/iesite din top 10 fata de ziua precedenta ---
+    prev_top = {}
+    if os.path.exists(SNAPSHOT_FILE):
+        try:
+            with open(SNAPSHOT_FILE, encoding="utf-8") as f:
+                prev_top = json.load(f)
+        except Exception:
+            prev_top = {}
+    changes = {}
+    for profile, top in today_top.items():
+        prev = set(prev_top.get(profile, []))
+        if prev:  # doar daca avem cu ce compara
+            changes[profile] = {
+                "intrate": [x for x in top if x not in prev],
+                "iesite": [x for x in prev if x not in top],
+            }
+    # salveaza topul de azi pentru maine
+    try:
+        with open(SNAPSHOT_FILE, "w", encoding="utf-8") as f:
+            json.dump(today_top, f, ensure_ascii=False, indent=1)
+    except Exception as ex:
+        print(f"Nu pot salva snapshot: {ex}")
+
+    context = {"gainers": gainers, "losers": losers, "changes": changes}
+    return sections, context
 
 
 def send_email(pdf_bytes):
@@ -111,8 +150,8 @@ def main():
         print(f"Nu trimit acum (ora Romaniei={ora}, zi lucratoare={e_lucratoare}). "
               f"Trimit doar la orele {sorted(ORE_TRIMITERE)} luni-vineri.")
         return
-    sections = build_sections()
-    pdf = build_daily_report_pdf(sections)
+    sections, context = build_sections()
+    pdf = build_daily_report_pdf(sections, context=context)
     print(f"PDF generat: {len(pdf)} bytes")
     send_email(pdf)
 

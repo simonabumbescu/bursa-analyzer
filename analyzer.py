@@ -567,6 +567,8 @@ def analyze_company(ticker_symbol):
         "52w Low": low52,
         "Volum mediu": info.get("averageVolume"),
         "Sector": info.get("sector"),
+        "Variatie zi %": (round((close.iloc[-1] / close.iloc[-2] - 1) * 100, 2)
+                          if len(close) >= 2 else None),
     }
 
     # ---------------- SCOR GLOBAL ----------------
